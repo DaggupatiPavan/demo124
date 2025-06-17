@@ -1,19 +1,26 @@
-name: "CI/CD Pipeline with Logging"
+name: Capture Workflow Details Example
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
 
 jobs:
-  logging_job:
+  capture-details:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: Set up GitHub Action Logging Pre-op
-        uses: 
+      - name: Checkout Code
+        uses: actions/checkout@v2
+      
+      - name: Capture Workflow Details
+        uses: ./
         with:
-          version: "v1.0.0"
-          log_level: "INFO"
-          api_url: "https://your-api.com/logs"
+          logging_level: 'info'  # Info, Debug, Error
+          output_file: 'workflow_output.txt'
+      
+      - name: Upload captured details as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: workflow-details
+          path: workflow_output.txt
