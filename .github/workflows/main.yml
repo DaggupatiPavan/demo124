@@ -20,7 +20,7 @@ jobs:
           output_file: 'workflow_output.txt'
       
       - name: Upload captured details as artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: workflow-details
           path: workflow_output.txt
