@@ -49,17 +49,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout code
       - name: Checkout Code
         uses: actions/checkout@v2
 
-      # Set up Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '16'
 
-      # Install dependencies
       - name: Install dependencies
         run: npm install
 
@@ -77,18 +74,24 @@ jobs:
       # Collect Workflow Logs (at the end)
       - name: Collect Logs from Workflow
         id: collect-logs
-        uses: ./  # Path to your custom action
+        uses: ./  # Reference the custom action
         with:
-          output_file: 'workflow_output.txt'  # Where logs will be saved
+          output_file: 'workflow_output.txt'  # Log file name
           start_time: ${{ github.event.head_commit.timestamp }}
           logging_level: 'info'
           steps_log: |
-            ${{ steps.step1.outputs.stdout }}${{ steps.step2.outputs.stdout }}  # Collect step logs dynamically
+            ${{ steps.step1.outputs.stdout }}${{ steps.step2.outputs.stdout }}  # Collect logs dynamically
 
-      # Upload collected logs as artifact
+      # Debug: List files to see if 'workflow_output.txt' exists
+      - name: List files for debugging
+        run: |
+          ls -l
+
+      # Upload captured details as artifact
       - name: Upload captured details as artifact
         uses: actions/upload-artifact@v4
         with:
           name: workflow-details
-          path: workflow_output.txt
+          path: workflow_output.txt  # Ensure this matches the file path
         if: always()  # Run this even if any previous step fails
+
