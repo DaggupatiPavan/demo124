@@ -1,4 +1,43 @@
-name: Capture Workflow Details Example
+# name: Capture Workflow Details Example
+
+# on:
+#   push:
+#     branches:
+#       - main
+
+# jobs:
+#   capture-details:
+#     runs-on: ubuntu-latest
+    
+#     steps:
+#       - name: Checkout Code
+#         uses: actions/checkout@v2
+        
+#       - name: Set up Node.js
+#         uses: actions/setup-node@v3
+#         with:
+#           node-version: '16'  # Or any other version you prefer
+
+#       - name: Install dependencies
+#         run: npm install
+       
+#       - name: Capture Workflow Details
+#         uses: ./  # Adjust path if necessary
+#         with:
+#           logging_level: 'info'
+#           output_file: 'workflow_output.txt'
+#       - name: error code
+#         run: |
+#           #!/bin/bash
+#           docker rmi test
+#       - name: Upload captured details as artifact
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: workflow-details
+#           path: workflow_output.txt
+#         if: always()
+
+name: Capture Workflow Details
 
 on:
   push:
@@ -8,31 +47,48 @@ on:
 jobs:
   capture-details:
     runs-on: ubuntu-latest
-    
+
     steps:
+      # Checkout code
       - name: Checkout Code
         uses: actions/checkout@v2
-        
+
+      # Set up Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '16'  # Or any other version you prefer
+          node-version: '16'
 
+      # Install dependencies
       - name: Install dependencies
         run: npm install
-       
-      - name: Capture Workflow Details
-        uses: ./  # Adjust path if necessary
-        with:
-          logging_level: 'info'
-          output_file: 'workflow_output.txt'
-      - name: error code
+
+      # Example step that might fail (docker command)
+      - name: Run a command that might fail (docker)
         run: |
-          #!/bin/bash
+          set -e
           docker rmi test
+
+      # Example step that will fail intentionally
+      - name: Run another command that might fail
+        run: |
+          echo "This step might fail." && false
+
+      # Collect Workflow Logs (at the end)
+      - name: Collect Logs from Workflow
+        id: collect-logs
+        uses: ./  # Path to your custom action
+        with:
+          output_file: 'workflow_output.txt'  # Where logs will be saved
+          start_time: ${{ github.event.head_commit.timestamp }}
+          logging_level: 'info'
+          steps_log: |
+            ${{ steps.step1.outputs.stdout }}${{ steps.step2.outputs.stdout }}  # Collect step logs dynamically
+
+      # Upload collected logs as artifact
       - name: Upload captured details as artifact
         uses: actions/upload-artifact@v4
         with:
           name: workflow-details
           path: workflow_output.txt
-        if: always()
+        if: always()  # Run this even if any previous step fails
