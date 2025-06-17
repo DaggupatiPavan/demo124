@@ -1,0 +1,30 @@
+name: "Action Logging Pre-op"
+description: "Captures version, input parameters, logging levels, and publishes logs via REST API"
+inputs:
+  version:
+    description: 'Version ID of the Action'
+    required: true
+  log_level:
+    description: 'Logging Level (Info, Error, Debug)'
+    required: true
+  api_url:
+    description: 'URL of the REST API for live logging'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        pip install requests
+
+    - name: Run Python logging script
+      run: |
+        python3 log_action.py ${{ inputs.version }} ${{ inputs.log_level }} ${{ inputs.api_url }}
