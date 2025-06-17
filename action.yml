@@ -1,35 +1,15 @@
-name: "Action Logging Pre-op"
-description: "Captures version, input parameters, logging levels, and publishes logs via REST API"
-
+name: 'Capture Workflow Details'
+description: 'Captures workflow details, parameters, and output.'
 inputs:
-  version:
-    description: 'Version of the Action'
-    required: false
-    default: 'v1.0.0'
-  log_level:
-    description: 'Logging Level (Info, Error, Debug)'
-    required: false
-    default: 'INFO'
-  api_url:
-    description: 'URL of the REST API for live logging'
-    required: false
-    default: 'http://example.com/api/logs'
+  logging_level:
+    description: 'Log level to use: info, debug, error'
+    required: true
+    default: 'info'
+  output_file:
+    description: 'Path to store the captured output file'
+    required: true
+    default: './workflow_output.txt'
 
 runs:
-  using: 'composite'
-  steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.x'
-
-    - name: Install dependencies
-      run: |
-        pip install requests
-
-    - name: Run Python logging script
-      run: |
-        python3 log_action.py --version="${{ inputs.version }}" --log_level="${{ inputs.log_level }}" --api_url="${{ inputs.api_url }}"
+  using: 'node12'
+  main: 'index.js'
