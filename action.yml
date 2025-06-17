@@ -1,15 +1,25 @@
-name: 'Capture Workflow Details'
-description: 'Captures workflow details, parameters, and output.'
+name: 'Collect Workflow Logs'
+description: 'Collect logs and workflow details at the end of the run.'
+
 inputs:
-  logging_level:
-    description: 'Log level to use: info, debug, error'
-    required: true
-    default: 'info'
   output_file:
-    description: 'Path to store the captured output file'
+    description: 'Path to the output file where logs will be saved.'
     required: true
-    default: './workflow_output.txt'
+    default: 'workflow_output.txt'
+
+  start_time:
+    description: 'Start time of the workflow in ISO format.'
+    required: true
+
+  logging_level:
+    description: 'Logging level (info, debug, error).'
+    required: false
+    default: 'info'
+
+  steps_log:
+    description: 'Logs from each step in the workflow.'
+    required: true
 
 runs:
   using: 'node12'
-  main: 'index.js'
+  main: 'main.js'  # The script that collects logs
