@@ -12,11 +12,19 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
-      
-      - name: Capture Workflow Details
-        uses: ./
+        
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
         with:
-          logging_level: 'info'  # Info, Debug, Error
+          node-version: '16'  # Or any other version you prefer
+
+      - name: Install dependencies
+        run: npm install
+       
+      - name: Capture Workflow Details
+        uses: ./  # Adjust path if necessary
+        with:
+          logging_level: 'info'
           output_file: 'workflow_output.txt'
       
       - name: Upload captured details as artifact
