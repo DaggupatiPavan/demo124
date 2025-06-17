@@ -1,0 +1,9 @@
+{
+  "name": "capture-workflow-details",
+  "version": "1.0.0",
+  "description": "GitHub Action to capture workflow details",
+  "main": "index.js",
+  "dependencies": {
+    "@actions/core": "^1.10.0"
+  }
+}
