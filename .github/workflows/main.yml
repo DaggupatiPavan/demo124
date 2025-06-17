@@ -1,0 +1,19 @@
+name: "CI/CD Pipeline with Logging"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  logging_job:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up GitHub Action Logging Pre-op
+        uses: 
+        with:
+          version: "v1.0.0"
+          log_level: "INFO"
+          api_url: "https://your-api.com/logs"
