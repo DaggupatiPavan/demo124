@@ -39,7 +39,7 @@ jobs:
 
       # ✅ Trigger Secondary Workflow
       - name: Trigger Secondary Workflow
-        uses: ./.github/actions/trigger-secondary-workflow
+        uses: ./.github/trigger-secondary-workflow
         with:
           token: ${{ secrets.PAT_TOKEN }}
           event_type: workflow-b
