@@ -1,0 +1,42 @@
+name: Workflow A - Trigger Workflow B (Dynamic Inputs)
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "User's name"
+        required: true
+      environment:
+        description: "Environment name"
+        required: true
+      version:
+        description: "Version number"
+        required: false
+
+jobs:
+  trigger-workflow-b:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get current job URL
+        id: current
+        run: echo "url=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
+
+      - name: Prepare dynamic payload
+        id: prepare
+        run: |
+          PAYLOAD="{\"job_url\": \"${{ steps.current.outputs.url }}\""
+          for key in $(jq -r 'keys[]' <<< '${{ toJson(github.event.inputs) }}'); do
+            value=$(jq -r --arg k "$key" '.[$k]' <<< '${{ toJson(github.event.inputs) }}')
+            PAYLOAD+=", \"$key\": \"$value\""
+          done
+          PAYLOAD+="}"
+          echo "payload=$PAYLOAD" >> $GITHUB_OUTPUT
+
+      - name: Trigger Workflow B
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          repository: ${{ github.repository }}
+          event-type: trigger-workflow-b
+          client-payload: ${{ steps.prepare.outputs.payload }}
