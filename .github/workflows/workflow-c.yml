@@ -61,15 +61,12 @@ jobs:
           STATUS="${{ steps.fetch.outputs.status }}"
           JOB_URL="${{ github.event.client_payload.job_url }}"
       
-          echo "Generating audit report for run: $WORKFLOW_NAME"
-      
           {
             echo "==============================="
             echo "Inputs in workflow: \"$WORKFLOW_NAME\""
             echo "==============================="
-      
-            # Dynamically print all inputs
-            echo "${{ toJson(github.event.client_payload) }}" | jq 'del(.job_url)' | jq -r 'to_entries[] | "\(.key): \(.value)"'
+            echo '${{ toJson(github.event.client_payload) }}' | jq 'del(.job_url)' > audit/inputs.json
+            jq -r 'to_entries[] | "\(.key): \(.value)"' audit/inputs.json
       
             echo ""
             echo "==============================="
@@ -83,7 +80,6 @@ jobs:
             echo "==============================="
             echo "STDERR (first found):"
             echo "==============================="
-      
             find logs -type f -name '*.txt' | while read -r file; do
               if grep -qi 'error' "$file"; then
                 echo "File: $file"
@@ -103,7 +99,6 @@ jobs:
             echo "End of audit report"
             echo "==============================="
           } > audit/workflow-a-audit-report.txt
-
 
 
       # - name: Combine audit report
