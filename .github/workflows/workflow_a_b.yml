@@ -1,0 +1,45 @@
+name: Excellent-workflowA->B-trigger
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "User's name"
+        required: true
+      environment:
+        description: "Environment name"
+        required: true
+      version:
+        description: "Version number"
+        required: false
+      goal:
+        description: "goal"
+        required: false
+      mytest:
+        description: "test number"
+        required: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Print Inputs (Simulate job)
+        run: |
+          echo "Name: ${{ github.event.inputs.name }}"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Version: ${{ github.event.inputs.version }}"
+          echo "Mytest: ${{ github.event.inputs.mytest }}"
+          echo "goal: ${{ github.event.inputs.goal }}"
+
+      # ✅ Add your build/deploy/test steps here...
+
+      # ✅ Trigger Secondary Workflow
+      - name: Trigger Secondary Workflow
+        uses: ./.github/actions/trigger-secondary-workflow
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          event_type: workflow-b
