@@ -1,0 +1,16 @@
+name: "Capture Logs Action"
+description: "Capture start time, inputs, log level, stdout/stderr to file.txt"
+inputs:
+  job_url:
+    description: "Job or workflow URL"
+    required: false
+  log_level:
+    description: "Logging level (info/debug/error)"
+    default: "info"
+runs:
+  using: "composite"
+  steps:
+    - run: |
+        chmod +x ${{ github.action_path }}/entrypoint.sh
+        ${{ github.action_path }}/entrypoint.sh
+      shell: bash
