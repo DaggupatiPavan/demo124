@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Capture job metadata
-        uses: ./.github/actions/capture-job-info
+        uses: ./.github/actions/capture-logs-action
         with:
           job_url: ${{ github.event.inputs.job_url }}
           log_level: ${{ github.event.inputs.log_level }}
