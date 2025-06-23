@@ -1,0 +1,32 @@
+# .github/workflows/run-workflow.yml
+name: Run and Capture Logs
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_url:
+        description: 'Job URL'
+        required: false
+      log_level:
+        description: 'Log Level'
+        required: false
+        default: 'info'
+
+jobs:
+  capture_logs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Run Logging Action
+        uses: ./.github/actions/capture-logs-action
+        with:
+          job_url: ${{ github.event.inputs.job_url }}
+          log_level: ${{ github.event.inputs.log_level }}
+
+      - name: Upload Logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs
+          path: workflowfile.txt
