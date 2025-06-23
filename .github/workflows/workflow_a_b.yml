@@ -42,4 +42,4 @@ jobs:
         uses: ./.github/trigger-secondary-workflow
         with:
           token: ${{ secrets.PAT_TOKEN }}
-          event_type: workflow-b
+          event_type: trigger-workflow-b 
