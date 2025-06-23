@@ -34,11 +34,23 @@ jobs:
       - name: Get full logs for the workflow run
         run: |
           mkdir logs
-          curl -L -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+          echo "Fetching logs for run: $RUN_ID"
+          curl -sSL -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
             -o logs/full_logs.zip \
             https://api.github.com/repos/${{ github.repository }}/actions/runs/$RUN_ID/logs
+          if file logs/full_logs.zip | grep -q 'Zip archive data'; then
+            unzip logs/full_logs.zip -d logs/
+            echo "Logs unzipped successfully."
+          else
+            echo "❌ logs/full_logs.zip is not a valid ZIP file. Possible reasons:"
+            echo "  - The run ID is incorrect"
+            echo "  - The PAT token lacks 'repo' and 'workflow' scopes"
+            echo "  - The logs are not yet available"
+            echo "--- File content preview ---"
+            head -n 20 logs/full_logs.zip
+            exit 1
+          fi
 
-          unzip logs/full_logs.zip -d logs/
 
       - name: Combine audit report
         run: |
