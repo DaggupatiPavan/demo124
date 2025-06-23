@@ -51,23 +51,77 @@ jobs:
             exit 1
           fi
 
-
       - name: Combine audit report
         run: |
           mkdir -p audit
+      
+          WORKFLOW_NAME=$(jq -r '.name' run.json)
+          START_TIME="${{ steps.fetch.outputs.start_time }}"
+          END_TIME="${{ steps.fetch.outputs.end_time }}"
+          STATUS="${{ steps.fetch.outputs.status }}"
+          JOB_URL="${{ github.event.client_payload.job_url }}"
+      
+          echo "Generating audit report for run: $WORKFLOW_NAME"
+      
           {
-            echo "Job URL: ${{ github.event.client_payload.job_url }}"
-            echo "Triggered by: ${{ github.event.client_payload.name }}"
-            echo "Environment: ${{ github.event.client_payload.environment }}"
-            echo "Version: ${{ github.event.client_payload.version }}"
-            echo "Start Time: ${{ steps.fetch.outputs.start_time }}"
-            echo "End Time: ${{ steps.fetch.outputs.end_time }}"
-            echo "Status: ${{ steps.fetch.outputs.status }}"
-            echo "---------------------------"
-            echo "Sample Log Output:"
-            echo "---------------------------"
-            find logs -type f -name '*.txt' | head -n 1 | xargs head -n 50
+            echo "==============================="
+            echo "Inputs in workflow: \"$WORKFLOW_NAME\""
+            echo "==============================="
+      
+            # Dynamically print all inputs
+            echo "${{ toJson(github.event.client_payload) }}" | jq 'del(.job_url)' | jq -r 'to_entries[] | "\(.key): \(.value)"'
+      
+            echo ""
+            echo "==============================="
+            echo "Job URL: $JOB_URL"
+            echo "Start Time: $START_TIME"
+            echo "End Time: $END_TIME"
+            echo "Status: $STATUS"
+            echo "==============================="
+      
+            echo ""
+            echo "==============================="
+            echo "STDERR (first found):"
+            echo "==============================="
+      
+            find logs -type f -name '*.txt' | while read -r file; do
+              if grep -qi 'error' "$file"; then
+                echo "File: $file"
+                grep -i 'error' "$file" | head -n 10
+                break
+              fi
+            done || echo "No errors found in logs."
+      
+            echo ""
+            echo "==============================="
+            echo "STDOUT (from first log file):"
+            echo "==============================="
+            find logs -type f -name '*.txt' | head -n 1 | xargs head -n 50 || echo "No stdout available."
+      
+            echo ""
+            echo "==============================="
+            echo "End of audit report"
+            echo "==============================="
           } > audit/workflow-a-audit-report.txt
+
+
+
+      # - name: Combine audit report
+      #   run: |
+      #     mkdir -p audit
+      #     {
+      #       echo "Job URL: ${{ github.event.client_payload.job_url }}"
+      #       echo "Triggered by: ${{ github.event.client_payload.name }}"
+      #       echo "Environment: ${{ github.event.client_payload.environment }}"
+      #       echo "Version: ${{ github.event.client_payload.version }}"
+      #       echo "Start Time: ${{ steps.fetch.outputs.start_time }}"
+      #       echo "End Time: ${{ steps.fetch.outputs.end_time }}"
+      #       echo "Status: ${{ steps.fetch.outputs.status }}"
+      #       echo "---------------------------"
+      #       echo "Sample Log Output:"
+      #       echo "---------------------------"
+      #       find logs -type f -name '*.txt' | head -n 1 | xargs head -n 50
+      #     } > audit/workflow-a-audit-report.txt
 
       - name: Upload Audit Report
         uses: actions/upload-artifact@v4
