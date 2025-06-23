@@ -1,0 +1,43 @@
+name: Trigger Secondary Workflow
+description: Collects current job URL and inputs, then triggers another workflow
+
+inputs:
+  token:
+    description: "PAT with repo and workflow scope"
+    required: true
+  event_type:
+    description: "Event type to trigger in the target workflow"
+    required: true
+  repository:
+    description: "Target repository (owner/repo)"
+    required: false
+    default: ${{ github.repository }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Get current job URL
+      id: current
+      shell: bash
+      run: |
+        echo "url=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
+
+    - name: Prepare dynamic payload
+      id: prepare
+      shell: bash
+      run: |
+        PAYLOAD="{\"job_url\": \"${{ steps.current.outputs.url }}\""
+        for key in $(jq -r 'keys[]' <<< '${{ toJson(github.event.inputs) }}'); do
+          value=$(jq -r --arg k "$key" '.[$k]' <<< '${{ toJson(github.event.inputs) }}')
+          PAYLOAD+=", \"$key\": \"$value\""
+        done
+        PAYLOAD+="}"
+        echo "payload=$PAYLOAD" >> $GITHUB_OUTPUT
+
+    - name: Trigger downstream workflow
+      uses: peter-evans/repository-dispatch@v3
+      with:
+        token: ${{ inputs.token }}
+        repository: ${{ inputs.repository }}
+        event-type: ${{ inputs.event_type }}
+        client-payload: ${{ steps.prepare.outputs.payload }}
