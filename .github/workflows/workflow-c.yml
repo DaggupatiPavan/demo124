@@ -1,0 +1,64 @@
+name: Workflow B - Audit Workflow A
+
+on:
+  repository_dispatch:
+    types: [trigger-workflow-c]
+
+jobs:
+  audit-upstream:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract run ID from job URL
+        id: extract
+        run: |
+          JOB_URL="${{ github.event.client_payload.job_url }}"
+          RUN_ID=$(echo "$JOB_URL" | grep -oE '[0-9]+$')
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+
+      - name: Fetch workflow run details
+        id: fetch
+        run: |
+          curl -s -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/actions/runs/$RUN_ID \
+            -o run.json
+
+          START_TIME=$(jq -r '.run_started_at' run.json)
+          END_TIME=$(jq -r '.updated_at' run.json)
+          STATUS=$(jq -r '.conclusion' run.json)
+          echo "start_time=$START_TIME" >> $GITHUB_OUTPUT
+          echo "end_time=$END_TIME" >> $GITHUB_OUTPUT
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+
+      - name: Get full logs for the workflow run
+        run: |
+          mkdir logs
+          curl -L -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+            -o logs/full_logs.zip \
+            https://api.github.com/repos/${{ github.repository }}/actions/runs/$RUN_ID/logs
+
+          unzip logs/full_logs.zip -d logs/
+
+      - name: Combine audit report
+        run: |
+          mkdir -p audit
+          {
+            echo "Job URL: ${{ github.event.client_payload.job_url }}"
+            echo "Triggered by: ${{ github.event.client_payload.name }}"
+            echo "Environment: ${{ github.event.client_payload.environment }}"
+            echo "Version: ${{ github.event.client_payload.version }}"
+            echo "Start Time: ${{ steps.fetch.outputs.start_time }}"
+            echo "End Time: ${{ steps.fetch.outputs.end_time }}"
+            echo "Status: ${{ steps.fetch.outputs.status }}"
+            echo "---------------------------"
+            echo "Sample Log Output:"
+            echo "---------------------------"
+            find logs -type f -name '*.txt' | head -n 1 | xargs head -n 50
+          } > audit/workflow-a-audit-report.txt
+
+      - name: Upload Audit Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-a-audit
+          path: audit/workflow-a-audit-report.txt
