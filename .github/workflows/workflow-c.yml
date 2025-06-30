@@ -2,7 +2,7 @@ name: Workflow B - Audit Workflow A
 
 on:
   repository_dispatch:
-    types: [trigger-workflow-c]
+    types: [trigger-workflow-test]
 
 jobs:
   audit-upstream:
