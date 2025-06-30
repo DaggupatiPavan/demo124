@@ -5,9 +5,9 @@ inputs:
   token:
     description: "PAT with repo and workflow scope"
     required: true
-  event_type:
-    description: "Event type to trigger in the target workflow"
-    required: true
+  # event_type:
+  #   description: "Event type to trigger in the target workflow"
+  #   required: true
   repository:
     description: "Target repository (owner/repo)"
     required: false
