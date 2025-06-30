@@ -55,17 +55,18 @@ jobs:
         run: |
           mkdir -p audit
 
-          # Extract values from API and payload
+          # Extract values
           WORKFLOW_NAME=$(jq -r '.name' run.json)
           START_TIME="${{ steps.fetch.outputs.start_time }}"
           END_TIME="${{ steps.fetch.outputs.end_time }}"
           STATUS="${{ steps.fetch.outputs.status }}"
           JOB_URL="${{ github.event.client_payload.job_url }}"
 
-          # Parse inputs as JSON and strip job_url
-          echo '${{ toJson(github.event.client_payload) }}' | jq 'del(.job_url)' > audit/inputs.json
+          # Extract and clean inputs JSON
+          INPUT_JSON=$(echo '${{ toJson(github.event.client_payload) }}' | jq 'del(.job_url)' 2>/dev/null || echo '{}')
+          echo "$INPUT_JSON" > audit/inputs.json
 
-          # Gather logs
+          # Log summary extraction
           ERROR_FILE=$(find logs -type f -name '*.txt' -exec grep -li 'error' {} + | head -n 1)
           if [ -n "$ERROR_FILE" ]; then
             STDERR=$(grep -i 'error' "$ERROR_FILE" | head -n 10 | jq -Rs .)
@@ -80,14 +81,14 @@ jobs:
             STDOUT="\"No stdout available\""
           fi
 
-          # Combine final JSON
+          # Generate final JSON report
           jq -n \
             --arg job_url "$JOB_URL" \
             --arg name "$WORKFLOW_NAME" \
             --arg start_time "$START_TIME" \
             --arg end_time "$END_TIME" \
             --arg status "$STATUS" \
-            --argjson inputs "$(cat audit/inputs.json)" \
+            --argjson inputs "$INPUT_JSON" \
             --argjson stderr $STDERR \
             --argjson stdout $STDOUT \
             '{
