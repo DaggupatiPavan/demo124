@@ -57,4 +57,4 @@ jobs:
         uses: ./.github/trigger-secondary-workflow
         with:
           token: ${{ secrets.PAT_TOKEN }}
-          event_type: trigger-workflow-c
+          event_type: trigger-workflow-test
