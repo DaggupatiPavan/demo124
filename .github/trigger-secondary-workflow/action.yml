@@ -26,18 +26,34 @@ runs:
       id: prepare
       shell: bash
       run: |
-        PAYLOAD="{\"job_url\": \"${{ steps.current.outputs.url }}\""
+        echo "{" > payload.json
         for key in $(jq -r 'keys[]' <<< '${{ toJson(github.event.inputs) }}'); do
           value=$(jq -r --arg k "$key" '.[$k]' <<< '${{ toJson(github.event.inputs) }}')
-          PAYLOAD+=", \"$key\": \"$value\""
+          echo "  \"$key\": \"$value\"," >> payload.json
         done
-        PAYLOAD+="}"
-        echo "payload=$PAYLOAD" >> $GITHUB_OUTPUT
-
-    - name: Trigger downstream workflow
-      uses: peter-evans/repository-dispatch@v3
+        echo "  \"job_url\": \"${{ steps.current.outputs.url }}\"" >> payload.json
+        echo "}" >> payload.json
+    
+    - name: Upload payload as artifact
+      uses: actions/upload-artifact@v4
       with:
-        token: ${{ inputs.token }}
-        repository: ${{ inputs.repository }}
-        event-type: ${{ inputs.event_type }}
-        client-payload: ${{ steps.prepare.outputs.payload }}
+        name: dynamic-payload
+        path: payload.json
+    - name: Trigger downstream workflow via curl
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}  # Replace with PAT if triggering another repo
+      run: |
+        curl -X POST https://api.github.com/repos/DaggupatiPavan/demo124/actions/workflows/workflow-c.yml/dispatches \
+          -H "Authorization: Bearer ${{ inputs.token }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          -d '{
+            "ref": "test"
+          }'
+    # - name: Trigger downstream workflow
+    #   uses: peter-evans/repository-dispatch@v3
+    #   with:
+    #     token: ${{ inputs.token }}
+    #     repository: ${{ inputs.repository }}
+    #     event-type: ${{ inputs.event_type }}
+    #     client-payload: ${{ steps.prepare.outputs.payload }}
