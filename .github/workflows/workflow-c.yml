@@ -1,130 +1,31 @@
-name: Workflow B - Audit Workflow A
+# .github/workflows/use-payload.yml
+name: Use Dynamic Payload
 
 on:
-  repository_dispatch:
-    types: [trigger-workflow-test]
+  workflow_dispatch:
 
 jobs:
-  audit-upstream:
+  use-artifact:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Extract run ID from job URL
-        id: extract
-        run: |
-          JOB_URL="${{ github.event.client_payload.job_url }}"
-          RUN_ID=$(echo "$JOB_URL" | grep -oE '[0-9]+$')
-          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
-          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
-
-      - name: Fetch workflow run details
-        id: fetch
-        run: |
-          curl -s -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/actions/runs/$RUN_ID \
-            -o run.json
-
-          START_TIME=$(jq -r '.run_started_at' run.json)
-          END_TIME=$(jq -r '.updated_at' run.json)
-          STATUS=$(jq -r '.conclusion' run.json)
-          echo "start_time=$START_TIME" >> $GITHUB_OUTPUT
-          echo "end_time=$END_TIME" >> $GITHUB_OUTPUT
-          echo "status=$STATUS" >> $GITHUB_OUTPUT
-
-      - name: Get full logs for the workflow run
-        run: |
-          mkdir logs
-          echo "Fetching logs for run: $RUN_ID"
-          curl -sSL -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
-            -o logs/full_logs.zip \
-            https://api.github.com/repos/${{ github.repository }}/actions/runs/$RUN_ID/logs
-          if file logs/full_logs.zip | grep -q 'Zip archive data'; then
-            unzip logs/full_logs.zip -d logs/
-            echo "Logs unzipped successfully."
-          else
-            echo "❌ logs/full_logs.zip is not a valid ZIP file. Possible reasons:"
-            echo "  - The run ID is incorrect"
-            echo "  - The PAT token lacks 'repo' and 'workflow' scopes"
-            echo "  - The logs are not yet available"
-            echo "--- File content preview ---"
-            head -n 20 logs/full_logs.zip
-            exit 1
-          fi
-
-      - name: Generate structured JSON audit report
-        run: |
-          mkdir -p audit
-
-          # Extract values
-          WORKFLOW_NAME=$(jq -r '.name' run.json)
-          START_TIME="${{ steps.fetch.outputs.start_time }}"
-          END_TIME="${{ steps.fetch.outputs.end_time }}"
-          STATUS="${{ steps.fetch.outputs.status }}"
-          JOB_URL="${{ github.event.client_payload.job_url }}"
-
-          # Extract and clean inputs JSON
-          INPUT_JSON=$(echo '${{ toJson(github.event.client_payload) }}' | jq 'del(.job_url)' 2>/dev/null || echo '{}')
-          echo "$INPUT_JSON" > audit/inputs.json
-
-          # Log summary extraction
-          ERROR_FILE=$(find logs -type f -name '*.txt' -exec grep -li 'error' {} + | head -n 1)
-          if [ -n "$ERROR_FILE" ]; then
-            STDERR=$(grep -i 'error' "$ERROR_FILE" | head -n 10 | jq -Rs .)
-          else
-            STDERR="\"No errors found\""
-          fi
-
-          STDOUT_FILE=$(find logs -type f -name '*.txt' | head -n 1)
-          if [ -n "$STDOUT_FILE" ]; then
-            STDOUT=$(head -n 50 "$STDOUT_FILE" | jq -Rs .)
-          else
-            STDOUT="\"No stdout available\""
-          fi
-
-          # Generate final JSON report
-          jq -n \
-            --arg job_url "$JOB_URL" \
-            --arg name "$WORKFLOW_NAME" \
-            --arg start_time "$START_TIME" \
-            --arg end_time "$END_TIME" \
-            --arg status "$STATUS" \
-            --argjson inputs "$INPUT_JSON" \
-            --argjson stderr $STDERR \
-            --argjson stdout $STDOUT \
-            '{
-              job_url: $job_url,
-              workflow_name: $name,
-              start_time: $start_time,
-              end_time: $end_time,
-              status: $status,
-              inputs: $inputs,
-              logs: {
-                stderr_preview: $stderr,
-                stdout_preview: $stdout
-              }
-            }' > audit/workflow-a-audit-report.json
-
-
-
-      # - name: Combine audit report
-      #   run: |
-      #     mkdir -p audit
-      #     {
-      #       echo "Job URL: ${{ github.event.client_payload.job_url }}"
-      #       echo "Triggered by: ${{ github.event.client_payload.name }}"
-      #       echo "Environment: ${{ github.event.client_payload.environment }}"
-      #       echo "Version: ${{ github.event.client_payload.version }}"
-      #       echo "Start Time: ${{ steps.fetch.outputs.start_time }}"
-      #       echo "End Time: ${{ steps.fetch.outputs.end_time }}"
-      #       echo "Status: ${{ steps.fetch.outputs.status }}"
-      #       echo "---------------------------"
-      #       echo "Sample Log Output:"
-      #       echo "---------------------------"
-      #       find logs -type f -name '*.txt' | head -n 1 | xargs head -n 50
-      #     } > audit/workflow-a-audit-report.txt
-
-      - name: Upload Audit Report
-        uses: actions/upload-artifact@v4
+      - name: Download artifact from Workflow A
+        uses: actions/download-artifact@v4
         with:
-          name: workflow-a-audit
-          path: audit/workflow-a-audit-report.txt
+          name: dynamic-payload
+          path: ./payload
+
+      - name: Show downloaded payload
+        run: cat ./payload/payload.json
+
+      - name: Export all payload keys as environment variables
+        run: |
+          echo "Exporting dynamic payload variables..."
+          while IFS== read -r key value; do
+            echo "$key=$value" >> $GITHUB_ENV
+          done < <(jq -r 'to_entries[] | "\(.key)=\(.value)"' ./payload/payload.json)
+
+      # - name: Use the dynamic environment variables
+      #   run: |
+      #     echo "ENV_TYPE: $ENV_TYPE"
+      #     echo "Job URL: $job_url"
