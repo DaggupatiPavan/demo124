@@ -7,15 +7,19 @@ on:
       name:
         description: "User's name"
         required: true
+        default: "pavan"
       environment:
         description: "Environment name"
         required: true
+        default: "test"
       version:
         description: "Version number"
         required: false
+        default: "v1"
       goal:
         description: "goal"
         required: false
+        default: "goal"
       mytest:
         description: "test number"
         required: true
