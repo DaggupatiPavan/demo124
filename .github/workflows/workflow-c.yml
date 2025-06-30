@@ -51,54 +51,58 @@ jobs:
             exit 1
           fi
 
-      - name: Combine audit report
+      - name: Generate structured JSON audit report
         run: |
           mkdir -p audit
-      
+
+          # Extract values from API and payload
           WORKFLOW_NAME=$(jq -r '.name' run.json)
           START_TIME="${{ steps.fetch.outputs.start_time }}"
           END_TIME="${{ steps.fetch.outputs.end_time }}"
           STATUS="${{ steps.fetch.outputs.status }}"
           JOB_URL="${{ github.event.client_payload.job_url }}"
-      
-          {
-            echo "==============================="
-            echo "Inputs in workflow: \"$WORKFLOW_NAME\""
-            echo "==============================="
-            echo '${{ toJson(github.event.client_payload) }}' | jq 'del(.job_url)' > audit/inputs.json
-            jq -r 'to_entries[] | "\(.key): \(.value)"' audit/inputs.json
-      
-            echo ""
-            echo "==============================="
-            echo "Job URL: $JOB_URL"
-            echo "Start Time: $START_TIME"
-            echo "End Time: $END_TIME"
-            echo "Status: $STATUS"
-            echo "==============================="
-      
-            echo ""
-            echo "==============================="
-            echo "STDERR (first found):"
-            echo "==============================="
-            find logs -type f -name '*.txt' | while read -r file; do
-              if grep -qi 'error' "$file"; then
-                echo "File: $file"
-                grep -i 'error' "$file" | head -n 10
-                break
-              fi
-            done || echo "No errors found in logs."
-      
-            echo ""
-            echo "==============================="
-            echo "STDOUT (from first log file):"
-            echo "==============================="
-            find logs -type f -name '*.txt' | head -n 1 | xargs head -n 50 || echo "No stdout available."
-      
-            echo ""
-            echo "==============================="
-            echo "End of audit report"
-            echo "==============================="
-          } > audit/workflow-a-audit-report.txt
+
+          # Parse inputs as JSON and strip job_url
+          echo '${{ toJson(github.event.client_payload) }}' | jq 'del(.job_url)' > audit/inputs.json
+
+          # Gather logs
+          ERROR_FILE=$(find logs -type f -name '*.txt' -exec grep -li 'error' {} + | head -n 1)
+          if [ -n "$ERROR_FILE" ]; then
+            STDERR=$(grep -i 'error' "$ERROR_FILE" | head -n 10 | jq -Rs .)
+          else
+            STDERR="\"No errors found\""
+          fi
+
+          STDOUT_FILE=$(find logs -type f -name '*.txt' | head -n 1)
+          if [ -n "$STDOUT_FILE" ]; then
+            STDOUT=$(head -n 50 "$STDOUT_FILE" | jq -Rs .)
+          else
+            STDOUT="\"No stdout available\""
+          fi
+
+          # Combine final JSON
+          jq -n \
+            --arg job_url "$JOB_URL" \
+            --arg name "$WORKFLOW_NAME" \
+            --arg start_time "$START_TIME" \
+            --arg end_time "$END_TIME" \
+            --arg status "$STATUS" \
+            --argjson inputs "$(cat audit/inputs.json)" \
+            --argjson stderr $STDERR \
+            --argjson stdout $STDOUT \
+            '{
+              job_url: $job_url,
+              workflow_name: $name,
+              start_time: $start_time,
+              end_time: $end_time,
+              status: $status,
+              inputs: $inputs,
+              logs: {
+                stderr_preview: $stderr,
+                stdout_preview: $stdout
+              }
+            }' > audit/workflow-a-audit-report.json
+
 
 
       # - name: Combine audit report
