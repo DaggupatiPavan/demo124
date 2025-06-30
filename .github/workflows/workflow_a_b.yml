@@ -1,4 +1,4 @@
-name: Excellent-workflowA->B-trigger
+name: test-trigger
 
 on:
   workflow_dispatch:
