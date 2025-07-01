@@ -1,68 +1,85 @@
-name: "PrePost Operation Fetcher"
-description: "Fetch workflow run inputs and metadata using GitHub API (bash only)"
-
+name: "Pre/Post Operation"
+description: "Collect inputs, timestamps, and save as JSON metadata"
 inputs:
   token:
-    description: 'GitHub token with repo permissions'
     required: true
+    description: GitHub token
   run_id:
-    description: 'Workflow run ID'
     required: true
+    description: GitHub run ID
   repository:
-    description: 'Repository name, e.g. owner/repo'
     required: true
+    description: Repository (owner/repo)
   mode:
-    description: '"pre-op" or "post-op" mode'
     required: true
+    description: pre-op or post-op
+  job_url:
+    required: false
+    description: Job URL
+  input_json:
+    required: false
+    description: All workflow inputs as JSON string
 
 outputs:
   metadata:
-    description: 'JSON metadata output'
+    description: Combined metadata output
 
 runs:
   using: "composite"
   steps:
-    - name: Fetch workflow run details from GitHub API
+    - name: Create metadata folder
+      shell: bash
+      run: mkdir -p metadata
+
+    - name: Generate Metadata
       shell: bash
       run: |
-        OWNER=$(echo "${{ inputs.repository }}" | cut -d/ -f1)
-        REPO=$(echo "${{ inputs.repository }}" | cut -d/ -f2)
-        RUN_ID=${{ inputs.run_id }}
-        TOKEN=${{ inputs.token }}
-        MODE=${{ inputs.mode }}
+        MODE="${{ inputs.mode }}"
+        JOB_URL="${{ inputs.job_url }}"
+        INPUT_JSON='${{ inputs.input_json }}'
 
-        RESPONSE=$(curl -s -H "Authorization: Bearer $TOKEN" \
-          -H "Accept: application/vnd.github+json" \
-          "https://api.github.com/repos/$OWNER/$REPO/actions/runs/$RUN_ID")
+        echo "Processing dynamic inputs..."
+        DYNAMIC_INPUTS="{"
+        first=true
+        for key in $(echo "$INPUT_JSON" | jq -r 'keys[]'); do
+          value=$(echo "$INPUT_JSON" | jq -r --arg k "$key" '.[$k]')
+          if [ "$first" = true ]; then
+            first=false
+          else
+            DYNAMIC_INPUTS+=", "
+          fi
+          DYNAMIC_INPUTS+="\"$key\": \"$value\""
+        done
+        DYNAMIC_INPUTS+="}"
+
+        echo "Parsed dynamic inputs: $DYNAMIC_INPUTS"
 
         if [[ "$MODE" == "pre-op" ]]; then
-          INPUTS=$(echo "$RESPONSE" | jq '.inputs // {}')
-          START_TIME=$(echo "$RESPONSE" | jq -r '.created_at')
+          START_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
           METADATA=$(jq -n \
-            --argjson inputs "$INPUTS" \
             --arg start_time "$START_TIME" \
-            '{phase: "pre-op", start_time: $start_time, inputs: $inputs}')
+            --arg job_url "$JOB_URL" \
+            --argjson inputs "$DYNAMIC_INPUTS" \
+            '{phase: "pre-op", start_time: $start_time, job_url: $job_url, inputs: $inputs}')
+
         elif [[ "$MODE" == "post-op" ]]; then
-          END_TIME=$(echo "$RESPONSE" | jq -r '.updated_at')
-          START_TIME=$(echo "$RESPONSE" | jq -r '.created_at')
-          CONCLUSION=$(echo "$RESPONSE" | jq -r '.conclusion')
+          END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          START_TIME=$(jq -r '.start_time' metadata/metadata.json 2>/dev/null || echo "$END_TIME")
           DURATION=$(($(date -d "$END_TIME" +%s) - $(date -d "$START_TIME" +%s)))
 
           METADATA=$(jq -n \
-            --arg end_time "$END_TIME" \
             --arg start_time "$START_TIME" \
-            --arg conclusion "$CONCLUSION" \
-            --argjson duration $DURATION \
-            '{phase: "post-op", end_time: $end_time, start_time: $start_time, conclusion: $conclusion, duration_seconds: $duration}')
+            --arg end_time "$END_TIME" \
+            --arg job_url "$JOB_URL" \
+            --argjson inputs "$DYNAMIC_INPUTS" \
+            --argjson duration "$DURATION" \
+            '{phase: "post-op", start_time: $start_time, end_time: $end_time, duration_seconds: $duration, job_url: $job_url, inputs: $inputs}')
         else
           echo "Invalid mode: $MODE"
           exit 1
         fi
 
         METADATA_SINGLE_LINE=$(echo "$METADATA" | jq -c '.')
-        
         echo "metadata=$METADATA_SINGLE_LINE" >> $GITHUB_OUTPUT
-        mkdir -p metadata
         echo "$METADATA_SINGLE_LINE" > metadata/metadata.json
-
