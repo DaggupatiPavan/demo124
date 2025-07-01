@@ -31,7 +31,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+      - name: sample data
+        run: |
+          echo "region: ${{ inputs.region }}"
       - name: Post-Op Step
         uses: ./.github/actions/
         id: postop
