@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Post-Op Step
-        uses: ./.github/actions/pre-post-op
+        uses: ./.github/actions/
         id: postop
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
