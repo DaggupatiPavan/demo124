@@ -1,0 +1,58 @@
+name: PrePost Operation Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: "Enable debug mode"
+        required: false
+        default: "false"
+      environment:
+        description: "Environment"
+        required: false
+        default: "dev"
+      region:
+        description: "Region"
+        required: false
+        default: "us-east-1"
+      feature_flag:
+        description: "Feature flag"
+        required: false
+        default: "off"
+
+jobs:
+  pre_post:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Pre-Op Step Fetch inputs and start time
+        uses: ./.github/actions/
+        id: preop
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          run_id: ${{ github.run_id }}
+          repository: ${{ github.repository }}
+          mode: pre-op
+
+      - name: Show Pre-Op Metadata
+        run: echo "Pre-Op metadata ${{ steps.preop.outputs.metadata }}"
+
+      - name: Main job logic
+        run: |
+          echo "Running main job..."
+          echo "Debug mode is ${{ inputs.debug }}"
+          echo "Environment is ${{ inputs.environment }}"
+          echo "Region is ${{ inputs.region }}"
+          echo "Feature flag is ${{ inputs.feature_flag }}"
+
+      - name: Post-Op Step Fetch end time, conclusion and duration
+        uses: ./.github/actions/
+        id: postop
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          run_id: ${{ github.run_id }}
+          repository: ${{ github.repository }}
+          mode: post-op
+
+      - name: Show Post-Op Metadata
+        run: echo "Post-Op metadata ${{ steps.postop.outputs.metadata }}"
