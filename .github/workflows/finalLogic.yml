@@ -19,6 +19,10 @@ on:
         description: "Feature flag"
         required: false
         default: "off"
+      featlag:
+        description: "Fafeag"
+        required: false
+        default: "Hello"
 
 jobs:
   pre_post:
