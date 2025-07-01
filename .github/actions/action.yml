@@ -1,0 +1,63 @@
+name: "PrePost Operation Fetcher"
+description: "Fetch workflow run inputs and metadata using GitHub API (bash only)"
+
+inputs:
+  token:
+    description: 'GitHub token with repo permissions'
+    required: true
+  run_id:
+    description: 'Workflow run ID'
+    required: true
+  repository:
+    description: 'Repository name, e.g. owner/repo'
+    required: true
+  mode:
+    description: '"pre-op" or "post-op" mode'
+    required: true
+
+outputs:
+  metadata:
+    description: 'JSON metadata output'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Fetch workflow run details from GitHub API
+      shell: bash
+      run: |
+        OWNER=$(echo "${{ inputs.repository }}" | cut -d/ -f1)
+        REPO=$(echo "${{ inputs.repository }}" | cut -d/ -f2)
+        RUN_ID=${{ inputs.run_id }}
+        TOKEN=${{ inputs.token }}
+        MODE=${{ inputs.mode }}
+
+        RESPONSE=$(curl -s -H "Authorization: Bearer $TOKEN" \
+          -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/$OWNER/$REPO/actions/runs/$RUN_ID")
+
+        if [[ "$MODE" == "pre-op" ]]; then
+          INPUTS=$(echo "$RESPONSE" | jq '.inputs // {}')
+          START_TIME=$(echo "$RESPONSE" | jq -r '.created_at')
+
+          METADATA=$(jq -n \
+            --argjson inputs "$INPUTS" \
+            --arg start_time "$START_TIME" \
+            '{phase: "pre-op", start_time: $start_time, inputs: $inputs}')
+        elif [[ "$MODE" == "post-op" ]]; then
+          END_TIME=$(echo "$RESPONSE" | jq -r '.updated_at')
+          START_TIME=$(echo "$RESPONSE" | jq -r '.created_at')
+          CONCLUSION=$(echo "$RESPONSE" | jq -r '.conclusion')
+          DURATION=$(($(date -d "$END_TIME" +%s) - $(date -d "$START_TIME" +%s)))
+
+          METADATA=$(jq -n \
+            --arg end_time "$END_TIME" \
+            --arg start_time "$START_TIME" \
+            --arg conclusion "$CONCLUSION" \
+            --argjson duration $DURATION \
+            '{phase: "post-op", end_time: $end_time, start_time: $start_time, conclusion: $conclusion, duration_seconds: $duration}')
+        else
+          echo "Invalid mode: $MODE"
+          exit 1
+        fi
+
+        echo "metadata=$METADATA" >> $GITHUB_OUTPUT
