@@ -1,44 +1,43 @@
 name: "Pre/Post Operation"
-description: "Collect inputs, timestamps, and save as JSON metadata"
+description: "Collect workflow inputs, logs, and generate audit reports"
 inputs:
   token:
     required: true
-    description: GitHub token
   run_id:
     required: true
-    description: GitHub run ID
   repository:
     required: true
-    description: Repository (owner/repo)
   mode:
     required: true
-    description: pre-op or post-op
   job_url:
     required: false
-    description: Job URL
   input_json:
     required: false
-    description: All workflow inputs as JSON string
+  pat_token:
+    required: false
+    description: PAT token for log access (post-op only)
 
 outputs:
   metadata:
-    description: Combined metadata output
+    description: Metadata (inputs, timestamps)
+  audit:
+    description: Structured audit JSON (post-op only)
 
 runs:
   using: "composite"
   steps:
-    - name: Create metadata folder
+    - name: Create workspace
       shell: bash
-      run: mkdir -p metadata
+      run: mkdir -p metadata logs audit
 
-    - name: Generate Metadata
+    - name: Generate Pre/Post Metadata
       shell: bash
       run: |
         MODE="${{ inputs.mode }}"
         JOB_URL="${{ inputs.job_url }}"
         INPUT_JSON='${{ inputs.input_json }}'
 
-        echo "Processing dynamic inputs..."
+        # Parse dynamic inputs
         DYNAMIC_INPUTS="{"
         first=true
         for key in $(echo "$INPUT_JSON" | jq -r 'keys[]'); do
@@ -52,11 +51,8 @@ runs:
         done
         DYNAMIC_INPUTS+="}"
 
-        echo "Parsed dynamic inputs: $DYNAMIC_INPUTS"
-
         if [[ "$MODE" == "pre-op" ]]; then
           START_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
           METADATA=$(jq -n \
             --arg start_time "$START_TIME" \
             --arg job_url "$JOB_URL" \
@@ -64,20 +60,60 @@ runs:
             '{phase: "pre-op", start_time: $start_time, job_url: $job_url, inputs: $inputs}')
 
         elif [[ "$MODE" == "post-op" ]]; then
+          echo "⏬ Fetching logs for run ${{ inputs.run_id }}"
+          curl -sSL -H "Authorization: token ${{ inputs.pat_token }}" \
+            -o logs/full_logs.zip \
+            https://api.github.com/repos/${{ inputs.repository }}/actions/runs/${{ inputs.run_id }}/logs
+
+          if file logs/full_logs.zip | grep -q 'Zip archive data'; then
+            unzip -qq logs/full_logs.zip -d logs/
+            echo "✅ Logs unzipped."
+          else
+            echo "❌ Log ZIP is invalid."
+            exit 1
+          fi
+
           END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           START_TIME=$(jq -r '.start_time' metadata/metadata.json 2>/dev/null || echo "$END_TIME")
           DURATION=$(($(date -d "$END_TIME" +%s) - $(date -d "$START_TIME" +%s)))
 
-          METADATA=$(jq -n \
+          # Extract log summaries
+          ERROR_FILE=$(find logs -type f -name '*.txt' -exec grep -li 'error' {} + | head -n 1)
+          if [ -n "$ERROR_FILE" ]; then
+            STDERR=$(grep -i 'error' "$ERROR_FILE" | head -n 10 | jq -Rs .)
+          else
+            STDERR="\"No errors found\""
+          fi
+
+          STDOUT_FILE=$(find logs -type f -name '*.txt' | head -n 1)
+          if [ -n "$STDOUT_FILE" ]; then
+            STDOUT=$(head -n 50 "$STDOUT_FILE" | jq -Rs .)
+          else
+            STDOUT="\"No stdout available\""
+          fi
+
+          # Audit JSON
+          AUDIT=$(jq -n \
+            --arg job_url "$JOB_URL" \
             --arg start_time "$START_TIME" \
             --arg end_time "$END_TIME" \
-            --arg job_url "$JOB_URL" \
+            --argjson duration $DURATION \
             --argjson inputs "$DYNAMIC_INPUTS" \
-            --argjson duration "$DURATION" \
-            '{phase: "post-op", start_time: $start_time, end_time: $end_time, duration_seconds: $duration, job_url: $job_url, inputs: $inputs}')
-        else
-          echo "Invalid mode: $MODE"
-          exit 1
+            --argjson stderr "$STDERR" \
+            --argjson stdout "$STDOUT" \
+            '{
+              job_url: $job_url,
+              start_time: $start_time,
+              end_time: $end_time,
+              duration_seconds: $duration,
+              inputs: $inputs,
+              logs: {
+                stderr_preview: $stderr,
+                stdout_preview: $stdout
+              }
+            }')
+
+          echo "$AUDIT" > audit/workflow-a-audit-report.json
         fi
 
         METADATA_SINGLE_LINE=$(echo "$METADATA" | jq -c '.')
