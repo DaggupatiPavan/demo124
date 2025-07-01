@@ -60,4 +60,7 @@ runs:
           exit 1
         fi
 
-        echo "metadata=$METADATA" >> $GITHUB_OUTPUT
+        METADATA_SINGLE_LINE=$(echo "$METADATA" | jq -c '.')
+        
+        echo "metadata=$METADATA_SINGLE_LINE" >> $GITHUB_OUTPUT
+
