@@ -31,29 +31,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Pre-Op Step
-        uses: ./.github/actions/
-        id: preop
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          run_id: ${{ github.run_id }}
-          repository: ${{ github.repository }}
-          mode: pre-op
-          job_url: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          input_json: ${{ toJson(github.event.inputs) }}
-
-      - name: Upload Pre-Op Metadata
-        uses: actions/upload-artifact@v4
-        with:
-          name: pre-op-metadata
-          path: metadata/metadata.json
-
-      - name: Main Job Logic
-        run: echo "Main work happens here..."
-
+      
       - name: Post-Op Step
-        uses: ./.github/actions/
+        uses: ./.github/actions/pre-post-op
         id: postop
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -62,9 +42,17 @@ jobs:
           mode: post-op
           job_url: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           input_json: ${{ toJson(github.event.inputs) }}
-
+          pat_token: ${{ secrets.PAT_TOKEN }}
+      
       - name: Upload Post-Op Metadata
         uses: actions/upload-artifact@v4
         with:
           name: post-op-metadata
           path: metadata/metadata.json
+      
+      - name: Upload Post-Op Audit Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-report
+          path: audit/workflow-a-audit-report.json
+      
