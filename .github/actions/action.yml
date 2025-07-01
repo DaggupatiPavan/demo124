@@ -63,4 +63,6 @@ runs:
         METADATA_SINGLE_LINE=$(echo "$METADATA" | jq -c '.')
         
         echo "metadata=$METADATA_SINGLE_LINE" >> $GITHUB_OUTPUT
+        mkdir -p metadata
+        echo "$METADATA_SINGLE_LINE" > metadata/metadata.json
 
