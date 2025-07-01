@@ -25,46 +25,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
-      - name: Pre-Op Step Fetch inputs and start time
+
+      - name: Pre-Op Step
         uses: ./.github/actions/
         id: preop
         with:
-          token: ${{ secrets.PAT_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           run_id: ${{ github.run_id }}
           repository: ${{ github.repository }}
           mode: pre-op
-      - name: Upload metadata artifact (pre-op)
+          job_url: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          input_json: ${{ toJson(github.event.inputs) }}
+
+      - name: Upload Pre-Op Metadata
         uses: actions/upload-artifact@v4
         with:
           name: pre-op-metadata
           path: metadata/metadata.json
 
-      - name: Show Pre-Op Metadata
-        run: echo "Pre-Op metadata ${{ steps.preop.outputs.metadata }}"
+      - name: Main Job Logic
+        run: echo "Main work happens here..."
 
-      - name: Main job logic
-        run: |
-          echo "Running main job..."
-          echo "Debug mode is ${{ inputs.debug }}"
-          echo "Environment is ${{ inputs.environment }}"
-          echo "Region is ${{ inputs.region }}"
-          echo "Feature flag is ${{ inputs.feature_flag }}"
-
-      - name: Post-Op Step Fetch end time, conclusion and duration
+      - name: Post-Op Step
         uses: ./.github/actions/
         id: postop
         with:
-          token: ${{ secrets.PAT_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           run_id: ${{ github.run_id }}
           repository: ${{ github.repository }}
           mode: post-op
-      - name: Upload metadata artifact (post-op)
+          job_url: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          input_json: ${{ toJson(github.event.inputs) }}
+
+      - name: Upload Post-Op Metadata
         uses: actions/upload-artifact@v4
         with:
           name: post-op-metadata
           path: metadata/metadata.json
-
-      - name: Show Post-Op Metadata
-        run: echo "Post-Op metadata ${{ steps.postop.outputs.metadata }}"
